@@ -7,6 +7,7 @@ from aiogram import Bot, Dispatcher
 from src.config import config
 from src.handlers import attach_handlers
 from src.services.booking import Booking
+from src.utils.tools import startup
 
 logging.basicConfig(level="INFO",
                     format="%(asctime)s [%(levelname)s]: %(name)s - %(message)s",
@@ -24,6 +25,7 @@ async def main():
         pass
 
     dp = Dispatcher()
+    dp.startup.register(startup)
 
     attach_handlers(dp)
 
