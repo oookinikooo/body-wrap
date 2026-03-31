@@ -10,7 +10,7 @@ class Config(BaseSettings):
 
     token: str = Field(validation_alias="TOKEN")
     admin_ids_str: str = Field(validation_alias="ADMIN_IDS")
-    master_key: str = Field(default='', validation_alias="MASTER_STR")
+    master_key: str = Field(default='', validation_alias="MASTER_KEY")
 
     @property
     def admin_ids(self):
