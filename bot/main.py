@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, date
 
 import aiocron
 from aiogram import Bot, Dispatcher
@@ -9,7 +9,7 @@ from aiogram.enums.parse_mode import ParseMode
 from src.config import config
 from src.handlers import attach_handlers
 from src.services.booking import Booking
-from src.utils.tools import startup
+from src.utils.tools import startup, notify_user
 
 logging.basicConfig(level="INFO",
                     format="%(asctime)s [%(levelname)s]: %(name)s - %(message)s",
@@ -23,8 +23,18 @@ async def main():
     bot = Bot(token=config.token,
               default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
+    @aiocron.crontab("0 8 * * *")
+    async def job_1_notify_about_session():
+        sessions = await Booking.get_by_day(date.today())
+        for s in sessions:
+            if s.user.id:
+                if await notify_user(bot, s):
+                    logger.info(f"Notify user #{s.user.id} about session at {s.time:%H:%M:%S}")
+                else:
+                    logger.error(f"Notify user #{s.user.id} about session at {s.time:%H:%M:%S} failed")
+
     @aiocron.crontab("5 0 * * *")
-    async def job_1_remove_expired_sessions():
+    async def job_2_remove_expired_sessions():
         now = datetime.now()
         sessions = await Booking.get_expired_sessions()
         expired = []

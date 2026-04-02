@@ -76,11 +76,11 @@ async def notify_admin(
     action: Literal["make", "reject"],
 ) -> bool:
     profile_link = f'<a href="tg://user?id={user.id}">{user.fullname}</a>'
-    text = (
-        f"{'✅ Записался' if action == 'make' else '❌ Отменил'} "
-        f"{profile_link} {session.date.day} {month_alias_dec(session.date.month)} "
+    text = f"{'✅ Записался' if action == 'make' else '❌ Отменил'} {profile_link}"
+    text += (
+        f" {session.date.day} {month_alias_dec(session.date.month)} "
         f"{weekday_alias(session.date.weekday())} на {session.time.hour}:00"
-    )
+    ).lower()
     for admin_id in config.admin_ids:
         for i in (1, 2, 3):
             try:
@@ -93,3 +93,23 @@ async def notify_admin(
                 break
 
     return True
+
+
+async def notify_user(bot: Bot, session: Session) -> bool:
+    if not session.user.id:
+        return False
+
+    for i in (1, 2, 3):
+        try:
+            await bot.send_message(
+                session.user.id,
+                "Доброе утро!\n"
+                f"Напоминаю, сегодня в {session.time.hour}:00 вы записаны на массаж"
+            )
+        except Exception as e:
+            logger.error(f"Notify user failed. Attempt-{i}. Retry after 0.15s\n"
+                        f"{type(e).__name__}: {e}")
+            await asyncio.sleep(0.15)
+        else:
+            return True
+    return False

@@ -7,6 +7,7 @@ from src.services.booking import Booking, User
 from src.utils.tools import month_alias_dec, notify_admin, set_user_commands
 
 from .deps import Keyboard as K
+from .deps import Message as M
 
 HI_MESSAGE = (
     "Добро пожаловать!\nС помощью бота можно записаться на массаж, "
@@ -69,10 +70,7 @@ async def cb_explore_day(cb: CallbackQuery):
     d = date.fromisoformat(date_str)
 
     rows = await Booking.get_by_day(d)
-    await cb.message.edit_text(
-        "Записаться можно в часы помечанные зеленым цветом",
-        reply_markup=K.day(d, rows),
-    )
+    await cb.message.edit_text(M.pick_hour(d), reply_markup=K.day(d, rows))
 
 
 async def cb_my_appointments(cb: CallbackQuery):
@@ -85,7 +83,7 @@ async def cb_my_appointments(cb: CallbackQuery):
     await cb.answer()
 
     await cb.message.edit_text(
-        "Для удаления записи на посещение нажмите на нее",
+        "Ваши записи\nДля удаления записи нажмите на нее",
         reply_markup=K.appointments(appointments),
     )
 
@@ -114,7 +112,7 @@ async def cb_make_appointment(cb: CallbackQuery):
 
     rows = await Booking.get_by_day(session.date)
     await cb.message.edit_text(
-        "Записаться можно в часы помечанные зеленым цветом",
+        M.pick_hour(session.date),
         reply_markup=K.day(session.date, rows),
     )
 
@@ -157,7 +155,7 @@ async def cb_delete_my_appointment(cb: CallbackQuery):
         text = HI_MESSAGE
         rpm = K.menu(len(appointments), free_slots)
     else:
-        text = "Для удаления записи на посещение нажмите на нее"
+        text = "Ваши записи\nДля удаления записи нажмите на нее"
         rpm = K.appointments(appointments)
 
     await cb.message.edit_text(text, reply_markup=rpm)

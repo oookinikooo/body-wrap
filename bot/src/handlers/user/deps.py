@@ -8,6 +8,17 @@ from src.services.booking import Session
 from src.utils.tools import month_alias, month_alias_dec, weekday_alias
 
 
+class Message:
+
+    @staticmethod
+    def pick_hour(d: date):
+        return (
+            f"{d.day} {month_alias_dec(d.month)} {weekday_alias(d.weekday())}\n\n"
+            "Для записи нажмите на нужное время, свободные окошки "
+            "выделены зеленым"
+        )
+
+
 class Keyboard:
 
     @staticmethod
