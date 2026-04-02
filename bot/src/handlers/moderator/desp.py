@@ -28,6 +28,13 @@ class Message:
             "запись будет отменена, а клиенту придет оповещение об отмене"
         )
 
+    @staticmethod
+    def session_rejected(session: Session):
+        return (
+            "❗️ Внимание!\n"
+            f"Сеанс {session.date:%d.%m.%Y} {session.time:%H:%M} был отменен модератором"
+        )
+
 
 class Keyboard:
     @staticmethod

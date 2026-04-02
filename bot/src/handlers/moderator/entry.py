@@ -1,7 +1,7 @@
 import calendar
 import logging
 from collections import defaultdict
-from datetime import date, time
+from datetime import date, time, datetime
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -108,11 +108,7 @@ async def cb_edit_times(cb: CallbackQuery):
     if row_id:
         session = await Booking.get(row_id)
         if session and session.user.id:
-            await cb.bot.send_message(
-                session.user.id,
-                "❗️ Внимание!\n"
-                f"Сеанс {session.date:%d.%m.%Y} {session.time:%H:%M} был отменен модератором",
-            )
+            await cb.bot.send_message(session.user.id, M.session_rejected(session))
         is_ok = await Booking.delete(row_id)
     else:
         await Booking.add(SessionAdd(date=picked_date, time=time(int(hour))))
@@ -145,7 +141,7 @@ async def cb_my_schedule(cb: CallbackQuery):
     picked_date = date.fromisoformat(date_str)
     page = int(page) if page and page.isdigit() else 0
 
-    now = date.today()
+    now = datetime.now()
     month_by_week = calendar.monthcalendar(picked_date.year, picked_date.month)
     if picked_date.year == now.year and picked_date.month == now.month:
         new_month_by_week = []
@@ -165,6 +161,8 @@ async def cb_my_schedule(cb: CallbackQuery):
     current_week = defaultdict(list[Session])
     for s in sessions:
         if s.date.day in week_days and s.time.hour != 0:
+            if s.date == now.date() and s.time < now.time():
+                continue
             current_week[s.date.weekday()].append(s)
 
     msg = f"Расписание c {min(w for w in week_days if w)} по {max(week_days)} <b>{month_alias_dec(picked_date.month)}</b>"
