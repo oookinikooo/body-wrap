@@ -17,7 +17,7 @@ class Keyboard:
             months.append(
                 [
                     Button(
-                        text=f"Записаться на {month_alias(d.month)} ({free_slots[d]})",
+                        text=f"Записаться на {month_alias(d.month).lower()} ({free_slots[d]})",
                         callback_data=f"{d}~explore_month",
                     )
                 ]
@@ -140,7 +140,7 @@ class Keyboard:
             rows.append(
                 [
                     Button(
-                        text=text,
+                        text=text.lower(),
                         callback_data=f"{s.id}~~delete_my_appointment",
                     )
                 ]

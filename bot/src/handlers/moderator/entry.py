@@ -226,11 +226,7 @@ async def cb_reset_all(cb: CallbackQuery):
                 logger.info("Clear database, because can't hide table")
                 break
 
-    if is_ok:
-        text = "Game over"
-    else:
-        text = "База все еще активна, обратитесь к администратору"
-    await cb.message.edit_text(text)
+    await cb.message.edit_text("Бот временно недоступен")
 
 
 async def cb_empty(cb: CallbackQuery):
