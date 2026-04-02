@@ -82,13 +82,14 @@ async def notify_admin(
         f"{weekday_alias(session.date.weekday())} на {session.time.hour}:00"
     )
     for i in (1, 2, 3):
-        try:
-            await bot.send_message(config.admin_ids[-1], text, parse_mode="HTML")
-        except Exception as e:
-            logger.error(f"Notify failed. Attempt-{i}. Retry after 0.15s\n"
-                         f"{type(e).__name__}: {e}")
-            await asyncio.sleep(0.15)
-        else:
-            break
+        for admin_id in config.admin_ids:
+            try:
+                await bot.send_message(admin_id, text, parse_mode="HTML")
+            except Exception as e:
+                logger.error(f"Notify failed. Attempt-{i}. Retry after 0.15s\n"
+                            f"{type(e).__name__}: {e}")
+                await asyncio.sleep(0.15)
+            else:
+                break
 
     return True
