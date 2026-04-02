@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import aiosqlite
 
@@ -89,9 +89,10 @@ class Service:
             return cursor.rowcount > 0
 
     async def get_active_month(self) -> list[date]:
+        today = date.today()
         async with self._session_maker() as db:
             async with db.execute(
-                f'SELECT * FROM {self._tablename} WHERE time LIKE "00:00:00" AND date like "%-01"'
+                f'SELECT * FROM {self._tablename} WHERE time = "00:00:00" and date >= "{today.replace(day=1)}"'
             ) as cursor:
                 rows = await cursor.fetchall()
                 return sorted([Session(**dict(r)).date for r in rows])
@@ -99,14 +100,13 @@ class Service:
     async def open_new_month(self) -> date:
         dates = await self.get_active_month()
         if not dates:
-            new_date = date.today()
-            new_date = new_date.replace(day=1)
+            new_date = date.today().replace(day=1)
         else:
-            has_date = dates[-1]
-            if has_date.month == 12:
-                new_date = has_date.replace(year=has_date.year + 1, month=1)
+            last_date = dates[-1]
+            if last_date.month == 12:
+                new_date = date(last_date.year + 1, 1, 1)
             else:
-                new_date = has_date.replace(month=has_date.month + 1)
+                new_date = last_date.replace(month=last_date.month + 1)
 
         async with self._session_maker() as db:
             cursor = await db.execute(
@@ -151,9 +151,12 @@ class Service:
         return bool(resp)
 
     async def user_appointments(self, user_id: int):
+        now = datetime.now()
         async with self._session_maker() as db:
             async with db.execute(
-                f"SELECT * FROM {self._tablename} WHERE user_id = ?", (user_id,)
+                f"SELECT * FROM {self._tablename} "
+                f'WHERE user_id = ? AND date >= "{now.date()}" AND time >= "{now.hour}:%"',
+                (user_id,),
             ) as cursor:
                 rows = await cursor.fetchall()
                 return [Session(**dict(r)) for r in rows]
@@ -167,7 +170,7 @@ class Service:
                     COUNT(*) as total_slots
                 FROM {self._tablename}
                 WHERE
-                    user_id IS NULL AND time > "{now.hour}:%"
+                    user_id IS NULL AND date >= "{now.date()}" AND time > "{now.hour}:%"
                 GROUP BY strftime('%Y-%m', date)
                 ORDER BY month;
             """
@@ -203,3 +206,12 @@ class Service:
 
     async def unhide(self):
         return await self._change_table(self._hide_tablename, self._tablename)
+
+    async def get_all_before_timestamp(self, timestamp: datetime):
+        async with self._session_maker() as db:
+            async with db.execute(
+                f"SELECT * FROM {self._tablename} WHERE date <= ? and time < ?",
+                (str(timestamp.date()), str(timestamp.time())),
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [Session(**dict(r)) for r in rows]
