@@ -170,7 +170,7 @@ class Service:
                     COUNT(*) as total_slots
                 FROM {self._tablename}
                 WHERE
-                    user_id IS NULL AND date >= "{now.date()}" AND time > "{now.hour}:%"
+                    user_id IS NULL AND date >= "{now.date()}" AND time > "{now.time().replace(microsecond=0)}"
                 GROUP BY strftime('%Y-%m', date)
                 ORDER BY month;
             """

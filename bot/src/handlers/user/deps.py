@@ -70,7 +70,7 @@ class Keyboard:
                 explore_date = current_date.replace(day=day)
                 row.append(
                     Button(
-                        text=f"{highlight(day) if today_month else day} {slots_count[day]}",
+                        text=f"{highlight(day) if today_month else day}",
                         style="success",
                         callback_data=f"{explore_date}~explore_day",
                     ),
