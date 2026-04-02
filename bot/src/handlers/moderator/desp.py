@@ -5,34 +5,46 @@ from datetime import date, datetime
 from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup
 from src.services.booking import Session
-from src.utils.tools import month_alias, weekday_alias
+from src.utils.tools import month_alias, weekday_alias, month_alias_dec
 
 
 class Message:
     @staticmethod
     def menu():
         return (
-            "Расписание - записи по неделям и месяцам\n"
-            "Править / Добавить расписание - добавление нового месяца и изменение "
-            "рабочих дней и часов по каждому из месяцев\n"
+            "<b>Расписание</b> - записи по неделям и месяцам\n\n"
+            "<b>Изменить расписание</b> - добавление нового месяца и изменение "
+            "рабочих дней / часов по каждому из месяцев\n"
+        )
+
+    @staticmethod
+    def edit_time(date: date):
+        return (
+            f"Изменение рабочего времени <b>{date.day} "
+            f"{month_alias_dec(date.month)} {weekday_alias(date.weekday())}</b>\n\n"
+            "Нажми на время - оно станет рабочим и будет подсвечено зеленым\n\n"
+            "Стоит пометка 👩🏼 - есть запись, если нажать на время с пометкой, "
+            "запись будет отменена, а клиенту придет оповещение об отмене"
         )
 
 
 class Keyboard:
     @staticmethod
     def menu():
-        return InlineKeyboardMarkup(inline_keyboard=[
-            [Button(text='Расписание', callback_data='0~0~my_schedule')],
-            [Button(text='Править / Добавить расписание', callback_data='~edit_schedule')],
-            [Button(text='Удалить все', style='danger', callback_data='~reset_all')],
-        ])
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [Button(text="Расписание", callback_data="~schedule_months")],
+                [Button(text="Изменить расписание", callback_data="~edit_schedule")],
+                [Button(text="Удалить все", style="danger", callback_data="~reset_all")],
+            ]
+        )
 
     @staticmethod
     def edit_or_add_months(dates: list[date]):
         rows = []
         row = []
         for d in dates:
-            row.append(Button(text=month_alias(d.month), callback_data=f'{d}~edit_month'))
+            row.append(Button(text=month_alias(d.month), callback_data=f"{d}~edit_month"))
             if len(row) >= 2:
                 rows.append(row)
                 row = []
@@ -42,44 +54,49 @@ class Keyboard:
 
         return InlineKeyboardMarkup(inline_keyboard=[
             *rows,
-            [Button(text='➕ Добавить новый месяц', callback_data='~add_new_month')],
-            [Button(text='Назад', callback_data='~menu')]
+            [Button(text="➕ Добавить новый месяц", callback_data="~add_new_month")],
+            [Button(text="Назад", callback_data="~menu")]
         ])
 
     @staticmethod
-    def edit_month(current_date: date, records: list[Session] = []):
+    def edit_month(current_date: date, sessions: list[Session] = []):
         def highlight(day: int):
             return day if day != date.today().day else f"[{day}]"
 
-        now = date.today()
+        now = datetime.now()
         today_month = current_date.year == now.year and current_date.month == now.month
 
-        by_day = defaultdict(int)
-        for r in records:
-            if r.time.hour != 0:
-                by_day[r.date.day] += 1
+        open_slots_count = defaultdict(int)
+        for s in sessions:
+            if s.time.hour == 0:
+                continue
+            if now.date() == s.date and s.time < now.time():
+                continue
+            open_slots_count[s.date.day] += 1
 
         rows = []
         for week in calendar.monthcalendar(current_date.year, current_date.month):
             row = []
             for day in week:
                 if day == 0:
-                    row.append(Button(text=" ", callback_data="~empty"))
-                    continue
+                    text = " "
+                elif today_month and day < now.day:
+                    text = "x"
+                else:
+                    text = None
 
-                if today_month and day < now.day:
-                    row.append(Button(text="x", callback_data="~empty"))
+                if text:
+                    row.append(Button(text=text, callback_data="~empty"))
                     continue
 
                 edit_date = current_date.replace(day=day)
-                text = f"{highlight(day) if today_month else day}"
-                if by_day[day] > 0:
-                    # text += f" ({by_day[day]})"
-                    style = 'success'
-                else:
-                    style = 'primary'
-
-                row.append(Button(text=text, style=style, callback_data=f"{edit_date}~edit_day"))
+                row.append(
+                    Button(
+                        text=f"{highlight(day) if today_month else day}",
+                        style="success" if open_slots_count[day] > 0 else "primary",
+                        callback_data=f"{edit_date}~edit_day",
+                    )
+                )
             rows.append(row)
 
         week_alias = []
@@ -92,46 +109,36 @@ class Keyboard:
 
         return InlineKeyboardMarkup(
             inline_keyboard=[
+                [Button(text=month_alias(current_date.month), callback_data="~empty")],
                 week_alias,
                 *rows,
-                [Button(text='Назад', callback_data='~edit_schedule')]
+                [Button(text="Назад", callback_data="~edit_schedule")]
             ]
         )
 
     @staticmethod
-    def edit_day(current_date: date, records: list[Session]):
-        is_today = date.today() == current_date
-        active_time = defaultdict(bool)
-        for r in records:
-            active_time[r.time.hour] = True
-
-        has_recoreds = defaultdict(bool)
-        for r in records:
-            if r.user.id:
-                has_recoreds[r.time.hour] = True
+    def edit_day(current_date: date, sessions: list[Session]):
+        now = datetime.now()
 
         ids = defaultdict(int)
-        for r in records:
-            ids[r.time.hour] = r.id
+        busy_slots = defaultdict(bool)
+        actived_hours = defaultdict(bool)
+        for s in sessions:
+            ids[s.time.hour] = s.id
+            actived_hours[s.time.hour] = True
+            if s.user.id:
+                busy_slots[s.time.hour] = True
 
         rows = []
         row = []
         for hour in list(range(9, 22)):
-            if is_today and hour <= datetime.now().hour:
+            if now.date() == current_date and hour <= now.hour:
                 continue
-
-            text, style = f"{hour}:00", None
-
-            if active_time[hour]:
-                style = 'success'
-
-            if has_recoreds[hour]:
-                text += " 👩🏼"
 
             row.append(
                 Button(
-                    text=text,
-                    style=style,
+                    text=f"{hour}:00 {'👩🏼' if busy_slots[hour] else ''}",
+                    style="success" if actived_hours[hour] else None,
                     callback_data=f"{current_date}~{hour}~{ids[hour]}~edit_time",
                 )
             )
@@ -148,38 +155,40 @@ class Keyboard:
         ])
 
     @staticmethod
-    def slider(
-        month_page: int,
-        total_month_page: int,
-        inner_page: int,
-        total_inner_page: int,
-    ):
+    def schedule_months(dates: list[date]):
+        rows = []
+        row = []
+        for d in dates:
+            row.append(Button(text=month_alias(d.month), callback_data=f'{d}~0~my_schedule'))
+            if len(row) >= 2:
+                rows.append(row)
+                row = []
+        else:
+            if row:
+                rows.append(row)
+
+        return InlineKeyboardMarkup(inline_keyboard=[
+            *rows,
+            [Button(text="Назад", callback_data="~menu")],
+        ])
+
+    @staticmethod
+    def week_slider(current_date: date, page: int, total_page: int):
         slider = []
-        if inner_page > 0:
+        if page > 0:
             slider.append(
                 Button(
-                    text="«", callback_data=f"{month_page}~{inner_page-1}~my_schedule"
+                    text="«", callback_data=f"{current_date}~{page-1}~my_schedule"
                 )
             )
-        if inner_page + 1 < total_inner_page:
+        slider.append(Button(text='Назад', callback_data="~schedule_months"))
+        if page + 1 < total_page:
             slider.append(
                 Button(
-                    text="»", callback_data=f"{month_page}~{inner_page+1}~my_schedule"
+                    text="»", callback_data=f"{current_date}~{page+1}~my_schedule"
                 )
             )
-
-        month_slider = []
-        if month_page > 0:
-            month_slider.append(
-                Button(text="«", callback_data=f"{month_page - 1}~0~my_schedule")
-            )
-        month_slider.append(Button(text="Назад", callback_data="~menu"))
-        if month_page + 1 < total_month_page:
-            month_slider.append(
-                Button(text="»", callback_data=f"{month_page + 1}~0~my_schedule")
-            )
-
-        return InlineKeyboardMarkup(inline_keyboard=[slider, month_slider])
+        return InlineKeyboardMarkup(inline_keyboard=[slider])
 
     @staticmethod
     def reset_db():

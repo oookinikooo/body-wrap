@@ -5,7 +5,7 @@ from datetime import date, datetime
 from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup
 from src.services.booking import Session
-from src.utils.tools import month_alias_dec, month_alias, weekday_alias
+from src.utils.tools import month_alias, month_alias_dec, weekday_alias
 
 
 class Keyboard:
@@ -17,111 +17,106 @@ class Keyboard:
             months.append(
                 [
                     Button(
-                        text=f"{month_alias(d.month)} ({free_slots[d]})",
+                        text=f"Записаться на {month_alias(d.month)} ({free_slots[d]})",
                         callback_data=f"{d}~explore_month",
                     )
                 ]
             )
-
-        return InlineKeyboardMarkup(inline_keyboard=[
-            [Button(text=f'Мои записи ({appointment_count})', callback_data='~my_appointment')],
-            *months
-        ])
-
-    @staticmethod
-    def appointments(appointments: list[Session]):
-        rows = []
-        for a in sorted(appointments, key=lambda x: (x.date, x.time)):
-            rows.append(
-                [
-                    Button(
-                        text=f"{a.date.day} {month_alias_dec(a.date.month)} {a.time.hour}:00",
-                        callback_data=f"{a.id}~delete_my_appointment",
-                    )
-                ]
-            )
-
-        return InlineKeyboardMarkup(inline_keyboard=[
-            *rows,
-            [Button(text='Назад', callback_data='~user_menu')]
-        ])
-
-    @staticmethod
-    def month(current_date: date, records: list[Session] = []):
-        def highlight(day: int):
-            return day if day != date.today().day else f"[{day}]"
-
-        now = date.today()
-        today_month = current_date.year == now.year and current_date.month == now.month
-
-        by_day = defaultdict(int)
-        for r in records:
-            if r.time.hour != 0 and not r.user.id:
-                by_day[r.date.day] += 1
-
-        month_by_week = calendar.monthcalendar(current_date.year, current_date.month)
-        rows = []
-        for week in month_by_week:
-            row = []
-            for day in week:
-                if day == 0:
-                    row.append(Button(text=" ", callback_data="~empty"))
-                    continue
-
-                if today_month and day < now.day:
-                    row.append(Button(text="x", callback_data="~empty"))
-                    continue
-
-                edit_date = current_date.replace(day=day)
-                text = f"{highlight(day) if today_month else day}"
-                row.append(
-                    Button(
-                        text=text,
-                        style="success" if by_day[day] > 0 else None,
-                        callback_data=f"{edit_date}~explore_day",
-                    ),
-                )
-            rows.append(row)
-
-        week_alias = []
-        for number in range(0, 7):
-            week_day = f"{weekday_alias(number)}"
-            if today_month and number == now.weekday():
-                week_day = f"[{weekday_alias(number)}]"
-
-            week_alias.append(Button(text=week_day, callback_data="~empty"))
-
         return InlineKeyboardMarkup(
             inline_keyboard=[
-                week_alias,
-                *rows,
-                [Button(text='Назад', callback_data='~user_menu')]
+                [
+                    Button(
+                        text=f"Мои записи ({appointment_count})",
+                        callback_data="~my_appointment",
+                    )
+                ],
+                *months,
             ]
         )
 
     @staticmethod
-    def day(current_date: date, records: list[Session]):
-        is_today = date.today() == current_date
+    def month(current_date: date, sessions: list[Session] = []):
+        def highlight(day: int):
+            return day if day != date.today().day else f"[{day}]"
+
+        now = datetime.now()
+        today_month = current_date.year == now.year and current_date.month == now.month
+
+        slots_count = defaultdict(int)
+        for s in sessions:
+            if s.time.hour == 0:
+                continue
+            if s.date == now.date() and s.time < now.time():
+                continue
+            slots_count[s.date.day] += 1
+
+        rows = []
+        for week in calendar.monthcalendar(current_date.year, current_date.month):
+            row = []
+            for day in week:
+                if day == 0:
+                    text = " "
+                elif today_month and day < now.day:
+                    text = "x"
+                elif slots_count[day] == 0:
+                    text = f"{day}"
+                else:
+                    text = None
+
+                if text:
+                    row.append(Button(text=text, callback_data="~empty"))
+                    continue
+
+                explore_date = current_date.replace(day=day)
+                row.append(
+                    Button(
+                        text=f"{highlight(day) if today_month else day} {slots_count[day]}",
+                        style="success",
+                        callback_data=f"{explore_date}~explore_day",
+                    ),
+                )
+            rows.append(row)
+
+        weekdays_header = []
+        for number in range(0, 7):
+            text = f"{weekday_alias(number)}"
+            if today_month and number == now.weekday():
+                text = f"[{weekday_alias(number)}]"
+
+            weekdays_header.append(Button(text=text, callback_data="~empty"))
+
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [Button(text=month_alias(current_date.month), callback_data="~empty")],
+                weekdays_header,
+                *rows,
+                [Button(text="Назад", callback_data="~user_menu")],
+            ]
+        )
+
+    @staticmethod
+    def day(current_date: date, sessions: list[Session]):
+        now = datetime.now()
 
         free_slots = defaultdict(bool)
         ids = defaultdict(int)
-        for r in records:
-            if not r.user.id:
-                free_slots[r.time.hour] = True
-            ids[r.time.hour] = r.id
+        for s in sessions:
+            if not s.user.id:
+                free_slots[s.time.hour] = True
+            ids[s.time.hour] = s.id
 
         rows = []
         row = []
-        for s in sorted(records, key=lambda x: x.time):
+        for s in sorted(sessions, key=lambda x: x.time):
             hour = s.time.hour
-            if is_today and hour <= datetime.now().hour:
+            if now.date() == current_date and hour <= now.hour:
                 continue
 
             row.append(
                 Button(
                     text=f"{hour}:00",
-                    style='success' if free_slots[hour] else None,
-                    callback_data=f"{ids[hour]}~make_appointment" if free_slots[hour] else '~empty',
+                    style="success" if free_slots[hour] else None,
+                    callback_data=f"{ids[hour]}~make_appointment" if free_slots[hour] else "~empty",
                 ),
             )
 
@@ -135,3 +130,37 @@ class Keyboard:
             *rows,
             [Button(text="Назад", callback_data=f'{current_date}~explore_month')]
         ])
+
+    @staticmethod
+    def appointments(sessions: list[Session]):
+        rows = []
+        for s in sorted(sessions, key=lambda x: (x.date, x.time)):
+            text = f"{s.date.day} {month_alias_dec(s.date.month)} " \
+                   f"{weekday_alias(s.date.weekday())} {s.time.hour}:00"
+            rows.append(
+                [
+                    Button(
+                        text=text,
+                        callback_data=f"{s.id}~~delete_my_appointment",
+                    )
+                ]
+            )
+
+        return InlineKeyboardMarkup(
+            inline_keyboard=[*rows, [Button(text="Назад", callback_data="~user_menu")]]
+        )
+
+    @staticmethod
+    def confirm_cancel_appointment(session: Session):
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    Button(
+                        text="Да, отменить запись",
+                        style="danger",
+                        callback_data=f"{session.id}~1~delete_my_appointment",
+                    )
+                ],
+                [Button(text="Назад", callback_data="~my_appointment")],
+            ]
+        )

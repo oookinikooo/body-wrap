@@ -1,8 +1,11 @@
+import asyncio
 import logging
+from typing import Literal
 
 from aiogram import Bot
 from aiogram.types import BotCommand, BotCommandScopeChat
 from src.config import config
+from src.services.booking import Session, User
 
 logger = logging.getLogger('utils.tools')
 
@@ -64,3 +67,28 @@ async def set_moderator_commands(bot: Bot, user_id: int):
 
 async def startup(bot: Bot):
     await bot.send_message(chat_id=config.admin_ids[0], text='Bot started')
+
+
+async def notify_admin(
+    bot: Bot,
+    session: Session,
+    user: User,
+    action: Literal["make", "reject"],
+) -> bool:
+    profile_link = f'<a href="tg://user?id={user.id}">{user.fullname}</a>'
+    text = (
+        f"{'✅ Записался' if action == 'make' else '❌ Отменил'} "
+        f"{profile_link} {session.date.day} {month_alias_dec(session.date.month)} "
+        f"{weekday_alias(session.date.weekday())} на {session.time.hour}:00"
+    )
+    for i in (1, 2, 3):
+        try:
+            await bot.send_message(config.admin_ids[-1], text, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Notify failed. Attempt-{i}. Retry after 0.15s\n"
+                         f"{type(e).__name__}: {e}")
+            await asyncio.sleep(0.15)
+        else:
+            break
+
+    return True

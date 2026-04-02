@@ -9,7 +9,7 @@ from aiogram.types import CallbackQuery, Message
 from src.config import config
 from src.services.booking import Booking, Session, SessionAdd
 from src.utils.filters import ModeratorFilter
-from src.utils.tools import month_alias, set_moderator_commands, weekday_alias
+from src.utils.tools import month_alias, set_moderator_commands, weekday_alias, month_alias_dec
 
 from .desp import Keyboard as K
 from .desp import Message as M
@@ -64,7 +64,8 @@ async def cb_add_new_month(cb: CallbackQuery):
     rows = await Booking.get_month_by_date(date)
 
     await cb.message.edit_text(
-        "Вы добавили новый месяц, проваливайтесь в конкретные дни для правки рабочих часов",
+        f"Вы добавили {month_alias(date.month)} месяц, нажимая на дату, "
+        "добавьте рабочие часы",
         reply_markup=K.edit_month(date, rows),
     )
 
@@ -88,17 +89,12 @@ async def cb_edit_day(cb: CallbackQuery):
     await cb.answer()
 
     date_str, *_ = cb.data.split("~")
-    d = date.fromisoformat(date_str)
+    picked_date = date.fromisoformat(date_str)
 
-    rows = await Booking.get_by_day(d)
+    rows = await Booking.get_by_day(picked_date)
     await cb.message.edit_text(
-        f"Количество активных часов: {len(rows)}\n\n"
-        f"<i>Примечание:\n"
-        " * При удалении записи с пометкой 👩🏼 пользователю придет уведомление "
-        "о том, что сеанс отменен;"
-        " * Зеленый цвет показывает, что сеанс активирован</i>",
-        reply_markup=K.edit_day(d, rows),
-        parse_mode="HTML",
+        text=M.edit_time(picked_date),
+        reply_markup=K.edit_day(picked_date, rows),
     )
 
 
@@ -106,7 +102,7 @@ async def cb_edit_times(cb: CallbackQuery):
     await cb.answer()
 
     date_str, hour, row_id, *_ = cb.data.split("~")
-    d = date.fromisoformat(date_str)
+    picked_date = date.fromisoformat(date_str)
 
     row_id = int(row_id) if row_id and row_id != "0" else None
     if row_id:
@@ -119,26 +115,16 @@ async def cb_edit_times(cb: CallbackQuery):
             )
         is_ok = await Booking.delete(row_id)
     else:
-        await Booking.add(
-            SessionAdd(
-                date=d,
-                time=time(int(hour)),
-            )
-        )
+        await Booking.add(SessionAdd(date=picked_date, time=time(int(hour))))
 
-    rows = await Booking.get_by_day(d)
+    rows = await Booking.get_by_day(picked_date)
     await cb.message.edit_text(
-        f"Количество активных часов: {len(rows)}\n\n"
-        f"<i>Примечание:\n"
-        " * При удалении записи с пометкой 👩🏼 пользователю придет уведомление "
-        "о том, что сеанс отменен;"
-        " * Зеленый цвет показывает, что сеанс активирован</i>",
-        reply_markup=K.edit_day(d, rows),
-        parse_mode="HTML",
+        text=M.edit_time(picked_date),
+        reply_markup=K.edit_day(picked_date, rows),
     )
 
 
-async def cb_month_by_weeks(cb: CallbackQuery):
+async def cb_schedule_months(cb: CallbackQuery):
     await cb.answer()
 
     exists_month = await Booking.get_active_month()
@@ -146,14 +132,20 @@ async def cb_month_by_weeks(cb: CallbackQuery):
         await cb.answer("Расписания отсутствует", show_alert=True)
         return
 
+    await cb.message.edit_text(
+        "Расписание по месяцам",
+        reply_markup=K.schedule_months(exists_month),
+    )
+
+
+async def cb_my_schedule(cb: CallbackQuery):
     await cb.answer()
 
-    month_page, inner_page, *_ = cb.data.split("~")
-    month_page = int(month_page) if month_page else 0
-    inner_page = int(inner_page) if inner_page else 0
+    date_str, page, *_ = cb.data.split("~")
+    picked_date = date.fromisoformat(date_str)
+    page = int(page) if page and page.isdigit() else 0
 
     now = date.today()
-    picked_date = exists_month[month_page]
     month_by_week = calendar.monthcalendar(picked_date.year, picked_date.month)
     if picked_date.year == now.year and picked_date.month == now.month:
         new_month_by_week = []
@@ -167,37 +159,34 @@ async def cb_month_by_weeks(cb: CallbackQuery):
                 new_month_by_week.append(have_row)
         month_by_week = new_month_by_week
 
-    rows = await Booking.get_month_by_date(picked_date)
+    sessions = await Booking.get_month_by_date(picked_date)
 
-    week_days = month_by_week[inner_page]
-    text = f"Расписание на <b>{month_alias(picked_date.month)}</b> с {min(w for w in week_days if w)} по {max(week_days)}"
+    week_days = month_by_week[page]
     current_week = defaultdict(list[Session])
-    for r in rows:
-        if r.date.day in week_days:
-            if r.time.hour != 0:
-                current_week[r.date.weekday()].append(r)
+    for s in sessions:
+        if s.date.day in week_days and s.time.hour != 0:
+            current_week[s.date.weekday()].append(s)
 
+    msg = f"Расписание c {min(w for w in week_days if w)} по {max(week_days)} <b>{month_alias_dec(picked_date.month)}</b>"
+    text = ""
     if current_week:
-        for r in sorted(current_week):
-            day_hours = current_week[r]
-            text += f"\n<b>{weekday_alias(r)}</b>"
-            for s in sorted(day_hours, key=lambda x: x.time):
+        for week_day_number in sorted(current_week):
+            day_sessions = current_week[week_day_number]
+            if not day_sessions:
+                continue
+
+            text += f"\n\n<u>{day_sessions[0].date:%d.%m} {weekday_alias(week_day_number).lower()}</u>"
+            for s in sorted(day_sessions, key=lambda x: x.time):
                 if s.user.id:
-                    user_link = (
-                        f'<a href="tg://user?id={s.user.id}">{s.user.fullname}</a>'
-                    )
+                    user_link = f'<a href="tg://user?id={s.user.id}">{s.user.fullname}</a>'
                 else:
                     user_link = "Пусто"
                 text += f"\n - {s.time.hour}:00 - {user_link}"
-    else:
-        text += "\n\nДаты приема отсутствуют"
 
+    msg += text if text else "\n\nДаты приема отсутствуют"
     await cb.message.edit_text(
-        text,
-        reply_markup=K.slider(
-            month_page, len(exists_month), inner_page, len(month_by_week)
-        ),
-        parse_mode="HTML",
+        msg,
+        reply_markup=K.week_slider(picked_date, page, len(month_by_week)),
     )
 
 
@@ -283,7 +272,10 @@ def router():
         (cb_edit_month, F.data.endswith("~edit_month")),
         (cb_edit_day, F.data.endswith("~edit_day")),
         (cb_edit_times, F.data.endswith("~edit_time")),
-        (cb_month_by_weeks, F.data.endswith("~my_schedule")),
+
+        (cb_schedule_months, F.data.endswith("~schedule_months")),
+        (cb_my_schedule, F.data.endswith("~my_schedule")),
+
         (cb_reset_all, F.data.endswith("~reset_all")),
         (cb_empty, F.data.endswith("~empty")),
     ):
