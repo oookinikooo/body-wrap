@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from src.services.booking import Booking, User
-from src.utils.tools import month_alias_dec, notify_admin, set_user_commands
+from src.utils.tools import notify_admin, set_user_commands
 
 from .deps import Keyboard as K
 from .deps import Message as M
@@ -101,14 +101,25 @@ async def cb_make_appointment(cb: CallbackQuery):
         await cb.answer("Данный сеанс уже прошел", show_alert=True)
         return
 
-    is_ok = False
-    if not session.user.id:
-        user = User(id=cb.from_user.id, fullname=cb.from_user.full_name)
-        is_ok = await Booking.make_appointment(session.id, user)
-        if is_ok:
-            await notify_admin(cb.bot, session, user, "make")
+    if session.user:
+        await cb.answer("Уже занято. Выберите другое время", show_alert=True)
+    else:
+        is_ok = await Booking.make_appointment(
+            session.id,
+            User(
+                id=cb.from_user.id,
+                fullname=cb.from_user.full_name,
+                reservation_at=datetime.now(),
+            ),
+        )
+        if is_ok and (session := await Booking.get(session.id)):
+            await notify_admin(cb.bot, session, "make")
 
-    await cb.answer("Вы записались" if is_ok else "Уже заняно", show_alert=True)
+        if is_ok:
+            text = "Вы записались"
+        else:
+            text = "Ошибка записи. Повторите попытку"
+        await cb.answer(text, show_alert=True)
 
     rows = await Booking.get_by_day(session.date)
     await cb.message.edit_text(
@@ -124,28 +135,24 @@ async def cb_delete_my_appointment(cb: CallbackQuery):
     session_id = int(session_id)
 
     session = await Booking.get(session_id)
-    if session:
+    if session and session.user:
         if not sure_flag:
             await cb.answer()
 
             await cb.message.edit_text(
-                "Вы действительно хотите отменить запись "
-                f"<u>{session.date.day} {month_alias_dec(session.date.month)} на "
-                f"{session.time.hour}:00</u>?",
+                M.sure_to_decline(session),
                 reply_markup=K.confirm_cancel_appointment(session),
             )
             return
 
         is_ok = await Booking.reset_appointment(session_id)
         if is_ok:
-            await notify_admin(
-                cb.bot,
-                session,
-                User(id=user_id, fullname=cb.from_user.full_name),
-                "reject",
-            )
+            await notify_admin(cb.bot, session, "reject")
+            text = "Запись отменена!"
+        else:
+            text = "Запись не отменена! Повторите попытку"
 
-        await cb.answer("Запись отменена!")
+        await cb.answer(text)
     else:
         await cb.answer()
 

@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from datetime import datetime, date
+from collections import defaultdict
+from datetime import date, datetime, timedelta
 
 import aiocron
 from aiogram import Bot, Dispatcher
@@ -9,8 +10,7 @@ from aiogram.enums.parse_mode import ParseMode
 from src.config import config
 from src.handlers import attach_handlers
 from src.services.booking import Booking
-from src.utils.tools import startup, notify_user
-from collections import defaultdict
+from src.utils.tools import notify_user, startup
 
 logging.basicConfig(level="INFO",
                     format="%(asctime)s [%(levelname)s]: %(name)s - %(message)s",
@@ -24,12 +24,12 @@ async def main():
     bot = Bot(token=config.token,
               default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
-    @aiocron.crontab("0 8 * * *")
+    @aiocron.crontab("0 9,20 * * *")
     async def job_1_notify_about_session():
-        sessions = await Booking.get_by_day(date.today())
+        sessions = await Booking.get_by_day(date.today() + timedelta(days=1))
         need_notify = defaultdict(list)
         for s in sessions:
-            if s.user.id:
+            if s.user:
                 need_notify[s.user.id].append(s)
 
         if need_notify:

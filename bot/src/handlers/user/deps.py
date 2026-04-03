@@ -18,6 +18,15 @@ class Message:
             "выделены зеленым"
         )
 
+    @staticmethod
+    def sure_to_decline(session: Session):
+        return (
+            "Вы действительно хотите отменить запись "
+            f"<u>{session.date.day} {month_alias_dec(session.date.month)} "
+            f"{weekday_alias(session.date.weekday())} на "
+            f"{session.time.hour}:00</u>?"
+        )
+
 
 class Keyboard:
 
@@ -28,7 +37,7 @@ class Keyboard:
             months.append(
                 [
                     Button(
-                        text=f"Записаться на {month_alias(d.month).lower()} ({free_slots[d]})",
+                        text=f"Записаться на {month_alias(d.month)} ({free_slots[d]})",
                         callback_data=f"{d}~explore_month",
                     )
                 ]
@@ -90,15 +99,15 @@ class Keyboard:
 
         weekdays_header = []
         for number in range(0, 7):
-            text = f"{weekday_alias(number)}"
+            week_day = weekday_alias(number).capitalize()
             if today_month and number == now.weekday():
-                text = f"[{weekday_alias(number)}]"
+                week_day = f"[{week_day}]"
 
-            weekdays_header.append(Button(text=text, callback_data="~empty"))
+            weekdays_header.append(Button(text=week_day, callback_data="~empty"))
 
         return InlineKeyboardMarkup(
             inline_keyboard=[
-                [Button(text=month_alias(current_date.month), callback_data="~empty")],
+                [Button(text=month_alias(current_date.month).capitalize(), callback_data="~empty")],
                 weekdays_header,
                 *rows,
                 [Button(text="Назад", callback_data="~user_menu")],
@@ -112,7 +121,7 @@ class Keyboard:
         free_slots = defaultdict(bool)
         ids = defaultdict(int)
         for s in sessions:
-            if not s.user.id:
+            if not s.user:
                 free_slots[s.time.hour] = True
             ids[s.time.hour] = s.id
 
@@ -151,7 +160,7 @@ class Keyboard:
             rows.append(
                 [
                     Button(
-                        text=text.lower(),
+                        text=text,
                         callback_data=f"{s.id}~~delete_my_appointment",
                     )
                 ]

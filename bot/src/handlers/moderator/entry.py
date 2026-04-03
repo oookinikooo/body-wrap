@@ -1,7 +1,7 @@
 import calendar
 import logging
 from collections import defaultdict
-from datetime import date, time, datetime
+from datetime import date, datetime, time
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -9,7 +9,8 @@ from aiogram.types import CallbackQuery, Message
 from src.config import config
 from src.services.booking import Booking, Session, SessionAdd
 from src.utils.filters import ModeratorFilter
-from src.utils.tools import month_alias, set_moderator_commands, weekday_alias, month_alias_dec
+from src.utils.tools import (month_alias, month_alias_dec,
+                             set_moderator_commands, weekday_alias)
 
 from .desp import Keyboard as K
 from .desp import Message as M
@@ -45,7 +46,6 @@ async def cb_edit_or_add_months(cb: CallbackQuery):
     exists = await Booking.get_active_month()
 
     await cb.message.edit_text(
-        "Для добавления месяца кликните на кнопку 'Добавить новый месяц'\n"
         "Для внесения правок в расписание кликните на название месяца",
         reply_markup=K.edit_or_add_months(exists),
     )
@@ -110,7 +110,7 @@ async def cb_edit_times(cb: CallbackQuery):
     row_id = int(row_id) if row_id and row_id != "0" else None
     if row_id:
         session = await Booking.get(row_id)
-        if session and session.user.id:
+        if session and session.user:
             await cb.bot.send_message(session.user.id, M.session_rejected(session))
         is_ok = await Booking.delete(row_id)
     else:
@@ -124,12 +124,12 @@ async def cb_edit_times(cb: CallbackQuery):
 
 
 async def cb_schedule_months(cb: CallbackQuery):
-    await cb.answer()
-
     exists_month = await Booking.get_active_month()
     if not exists_month:
         await cb.answer("Расписания отсутствует", show_alert=True)
         return
+
+    await cb.answer()
 
     await cb.message.edit_text(
         "Расписание по месяцам",
@@ -168,7 +168,10 @@ async def cb_my_schedule(cb: CallbackQuery):
                 continue
             current_week[s.date.weekday()].append(s)
 
-    msg = f"Расписание c {min(w for w in week_days if w)} по {max(week_days)} <b>{month_alias_dec(picked_date.month)}</b>"
+    msg = (
+        f"Расписание c {min(w for w in week_days if w)} по {max(week_days)} "
+        f"<b>{month_alias_dec(picked_date.month)}</b>"
+    )
     text = ""
     if current_week:
         for week_day_number in sorted(current_week):
@@ -178,7 +181,7 @@ async def cb_my_schedule(cb: CallbackQuery):
 
             text += f"\n\n<u>{day_sessions[0].date:%d.%m} {weekday_alias(week_day_number).lower()}</u>"
             for s in sorted(day_sessions, key=lambda x: x.time):
-                if s.user.id:
+                if s.user:
                     user_link = f'<a href="tg://user?id={s.user.id}">{s.user.fullname}</a>'
                 else:
                     user_link = "Пусто"

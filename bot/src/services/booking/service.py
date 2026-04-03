@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timedelta
+from datetime import date
 
 import aiosqlite
 
@@ -38,6 +38,7 @@ class Service:
                     time TIME NOT NULL,
                     user_id INTEGER,
                     fullname TEXT,
+                    reservation_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
                 """
@@ -91,7 +92,7 @@ class Service:
         today = date.today()
         async with self._session_maker() as db:
             async with db.execute(
-                f'SELECT * FROM {self._tablename} WHERE time = "00:00:00" and date >= "{today.replace(day=1)}"'
+                f'SELECT * FROM {self._tablename} WHERE time = "00:00:00" AND date >= "{today.replace(day=1)}"'
             ) as cursor:
                 rows = await cursor.fetchall()
                 return sorted([Session(**dict(r)).date for r in rows])
@@ -127,7 +128,7 @@ class Service:
     async def get_by_day(self, date: date) -> list[Session]:
         async with self._session_maker() as db:
             async with db.execute(
-                f"SELECT * FROM {self._tablename} WHERE date = ?", (str(date),)
+                f'SELECT * FROM {self._tablename} WHERE date = ? AND time <> "00:00:00"', (str(date),)
             ) as cursor:
                 rows = await cursor.fetchall()
                 return [Session(**dict(r)) for r in rows]
@@ -141,12 +142,23 @@ class Service:
     async def make_appointment(self, session_id: int, user: User):
         resp = await self.update(
             session_id,
-            {"user_id": user.id, "fullname": user.fullname},
+            {
+                "user_id": user.id,
+                "fullname": user.fullname,
+                "reservation_at": user.reservation_at,
+            },
         )
         return bool(resp)
 
     async def reset_appointment(self, session_id: int):
-        resp = await self.update(session_id, {"user_id": None, "fullname": None})
+        resp = await self.update(
+            session_id,
+            {
+                "user_id": None,
+                "fullname": None,
+                "reservation_at": None,
+            },
+        )
         return bool(resp)
 
     async def user_appointments(self, user_id: int):

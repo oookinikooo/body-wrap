@@ -20,8 +20,8 @@ class Message:
     @staticmethod
     def edit_time(date: date):
         return (
-            f"<b>{date.day} {month_alias_dec(date.month).lower()} "
-            f"{weekday_alias(date.weekday()).lower()}</b> "
+            f"<b>{date.day} {month_alias_dec(date.month)} "
+            f"{weekday_alias(date.weekday())}</b> "
             "изменение рабочего времени\n\n"
             "Нажми на время - оно станет рабочим и будет подсвечено зеленым\n\n"
             "Стоит пометка 👩🏼 - есть запись, если нажать на время с пометкой, "
@@ -52,7 +52,12 @@ class Keyboard:
         rows = []
         row = []
         for d in dates:
-            row.append(Button(text=month_alias(d.month), callback_data=f"{d}~edit_month"))
+            row.append(
+                Button(
+                    text=month_alias(d.month).capitalize(),
+                    callback_data=f"{d}~edit_month",
+                )
+            )
             if len(row) >= 2:
                 rows.append(row)
                 row = []
@@ -109,7 +114,7 @@ class Keyboard:
 
         week_alias = []
         for i in range(0, 7):
-            week_day = weekday_alias(i)
+            week_day = weekday_alias(i).capitalize()
             if today_month and i == now.weekday():
                 week_day = f"[{week_day}]"
 
@@ -117,10 +122,15 @@ class Keyboard:
 
         return InlineKeyboardMarkup(
             inline_keyboard=[
-                [Button(text=month_alias(current_date.month), callback_data="~empty")],
+                [
+                    Button(
+                        text=month_alias(current_date.month).capitalize(),
+                        callback_data="~empty",
+                    )
+                ],
                 week_alias,
                 *rows,
-                [Button(text="Назад", callback_data="~edit_schedule")]
+                [Button(text="Назад", callback_data="~edit_schedule")],
             ]
         )
 
@@ -134,7 +144,7 @@ class Keyboard:
         for s in sessions:
             ids[s.time.hour] = s.id
             actived_hours[s.time.hour] = True
-            if s.user.id:
+            if s.user:
                 busy_slots[s.time.hour] = True
 
         rows = []
@@ -167,7 +177,12 @@ class Keyboard:
         rows = []
         row = []
         for d in dates:
-            row.append(Button(text=month_alias(d.month), callback_data=f'{d}~0~my_schedule'))
+            row.append(
+                Button(
+                    text=month_alias(d.month).capitalize(),
+                    callback_data=f"{d}~0~my_schedule",
+                )
+            )
             if len(row) >= 2:
                 rows.append(row)
                 row = []
@@ -201,6 +216,6 @@ class Keyboard:
     @staticmethod
     def reset_db():
         return InlineKeyboardMarkup(inline_keyboard=[
-            [Button(text='Да, очистить', style='danger', callback_data='1~reset_all')],
-            [Button(text='Назад', callback_data='~menu')],
+            [Button(text="Да, очистить", style="danger", callback_data="1~reset_all")],
+            [Button(text="Назад", callback_data="~menu")],
         ])
