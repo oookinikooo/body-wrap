@@ -149,7 +149,7 @@ class Keyboard:
 
         rows = []
         row = []
-        for hour in list(range(9, 22)):
+        for hour in list(range(9, 21)):
             if now.date() == current_date and hour <= now.hour:
                 continue
 
