@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, time
 
 import aiosqlite
 
@@ -108,13 +108,8 @@ class Service:
             else:
                 new_date = last_date.replace(month=last_date.month + 1)
 
-        async with self._session_maker() as db:
-            cursor = await db.execute(
-                f"INSERT INTO {self._tablename} (date, time) VALUES (?, ?)",
-                (str(new_date), "00:00:00"),
-            )
-            await db.commit()
-            return new_date
+        _ = await self.add(SessionAdd(date=new_date, time=time()))
+        return new_date
 
     async def get_month_by_date(self, date: date) -> list[Session]:
         async with self._session_maker() as db:

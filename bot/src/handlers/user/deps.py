@@ -68,7 +68,9 @@ class Keyboard:
                 continue
             if s.date == now.date() and s.time < now.time():
                 continue
-            slots_count[s.date.day] += 1
+
+            if not s.user:
+                slots_count[s.date.day] += 1
 
         rows = []
         for week in calendar.monthcalendar(current_date.year, current_date.month):

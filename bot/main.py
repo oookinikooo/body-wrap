@@ -24,8 +24,23 @@ async def main():
     bot = Bot(token=config.token,
               default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
+    @aiocron.crontab("0 8 * * *")
+    async def job_1_morning_notify():
+        sessions = await Booking.get_by_day(date.today())
+        need_notify = defaultdict(list)
+        for s in sessions:
+            if s.user:
+                need_notify[s.user.id].append(s)
+
+        if need_notify:
+            for user_id, sessions in need_notify.items():
+                if await notify_user(bot, user_id, sessions, 'today'):
+                    logger.info(f"Notify user #{user_id} about {len(sessions)} today")
+                else:
+                    logger.error(f"Notify user #{user_id} about {len(sessions)} today failed")
+
     @aiocron.crontab("0 9,20 * * *")
-    async def job_1_notify_about_session():
+    async def job_2_notify_about_session():
         sessions = await Booking.get_by_day(date.today() + timedelta(days=1))
         need_notify = defaultdict(list)
         for s in sessions:
@@ -34,13 +49,13 @@ async def main():
 
         if need_notify:
             for user_id, sessions in need_notify.items():
-                if await notify_user(bot, user_id, sessions):
+                if await notify_user(bot, user_id, sessions, 'tomorrow'):
                     logger.info(f"Notify user #{user_id} about {len(sessions)} today")
                 else:
                     logger.error(f"Notify user #{user_id} about {len(sessions)} today failed")
 
     @aiocron.crontab("5 0 * * *")
-    async def job_2_remove_expired_sessions():
+    async def job_3_remove_expired_sessions():
         now = datetime.now()
         sessions = await Booking.get_expired_sessions()
         expired = []

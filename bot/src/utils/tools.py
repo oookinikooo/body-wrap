@@ -96,21 +96,32 @@ async def notify_admin(bot: Bot, session: Session, action: Literal["make", "reje
     return True
 
 
-async def notify_user(bot: Bot, user_id: int, sessions: list[Session]) -> bool:
+def hi():
+    now_hour = datetime.now().hour
+    if now_hour < 12:
+        hi = "Доброе утро"
+    elif now_hour > 18:
+        hi = "Добрый вечер"
+    else:
+        hi = "Привет"
+    return hi
+
+
+async def notify_user(
+    bot: Bot,
+    user_id: int,
+    sessions: list[Session],
+    when: Literal["today", "tomorrow"] = "today",
+) -> bool:
     if hours := sorted([s.time.hour for s in sessions if s.user]):
-        now_hour = datetime.now().hour
-        if now_hour < 12:
-            hi = "Доброе утро"
-        elif now_hour > 18:
-            hi = "Добрый вечер"
-        else:
-            hi = "Привет"
         hours_list = ', '.join([f'{h}:00' for h in hours])
         for i in (1, 2, 3):
             try:
                 await bot.send_message(
                     user_id,
-                    f"{hi}!\nНапоминаю, завтра в {hours_list} вы записаны на массаж"
+                    f"{hi()}!\nНапоминаю, "
+                    f"{'сегодня' if when == 'today' else 'завтра'} "
+                    f"в {hours_list} вы записаны на массаж",
                 )
             except Exception as e:
                 logger.error(f"Notify user failed. Attempt-{i}. Retry after 0.15s\n"
