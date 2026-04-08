@@ -45,14 +45,23 @@ class Service:
             )
             await db.commit()
 
-    async def add(self, session: SessionAdd) -> int:
+    async def slot_already_allocated(self, session: SessionAdd) -> bool:
+        async with self._session_maker() as db:
+            cursor = await db.execute(
+                f"SELECT 1 FROM {self._tablename} "
+                f'WHERE date == "{session.date}" AND time == "{session.time}"'
+            )
+            row = await cursor.fetchone()
+            return bool(row)
+
+    async def add(self, session: SessionAdd) -> bool:
         async with self._session_maker() as db:
             cursor = await db.execute(
                 f"INSERT INTO {self._tablename} (date, time) VALUES (?, ?)",
                 (str(session.date), str(session.time)),
             )
             await db.commit()
-            return cursor.lastrowid
+            return bool(cursor.lastrowid)
 
     async def get(self, id: int) -> Session | None:
         async with self._session_maker() as db:

@@ -114,13 +114,19 @@ async def cb_edit_times(cb: CallbackQuery):
             await cb.bot.send_message(session.user.id, M.session_rejected(session))
         is_ok = await Booking.delete(row_id)
     else:
-        await Booking.add(SessionAdd(date=picked_date, time=time(int(hour))))
+        slot = SessionAdd(date=picked_date, time=time(int(hour)))
+        exists = await Booking.slot_already_allocated(slot)
+        if not exists:
+            await Booking.add(slot)
 
     rows = await Booking.get_by_day(picked_date)
-    await cb.message.edit_text(
-        text=M.edit_time(picked_date),
-        reply_markup=K.edit_day(picked_date, rows),
-    )
+    try:
+        await cb.message.edit_text(
+            text=M.edit_time(picked_date),
+            reply_markup=K.edit_day(picked_date, rows),
+        )
+    except Exception as e:
+        logger.error(f"Edit times for {date_str}\n{type(e).__name__}: {e}")
 
 
 async def cb_schedule_months(cb: CallbackQuery):
