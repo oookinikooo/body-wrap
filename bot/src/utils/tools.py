@@ -115,14 +115,14 @@ async def notify_user(
 ) -> bool:
     if hours := sorted([s.time.hour for s in sessions if s.user]):
         hours_list = ', '.join([f'{h}:00' for h in hours])
+        text = (
+            f"{hi()}!\nНапоминаю, "
+            f"{'сегодня' if when == 'today' else 'завтра'} "
+            f"в {hours_list} вы записаны на обертывание"
+        )
         for i in (1, 2, 3):
             try:
-                await bot.send_message(
-                    user_id,
-                    f"{hi()}!\nНапоминаю, "
-                    f"{'сегодня' if when == 'today' else 'завтра'} "
-                    f"в {hours_list} вы записаны на массаж",
-                )
+                await bot.send_message(user_id, text)
             except Exception as e:
                 logger.error(f"Notify user failed. Attempt-{i}. Retry after 0.15s\n"
                             f"{type(e).__name__}: {e}")

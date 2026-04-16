@@ -9,10 +9,6 @@ from src.utils.tools import notify_admin, set_user_commands
 from .deps import Keyboard as K
 from .deps import Message as M
 
-HI_MESSAGE = (
-    "Добро пожаловать!\nС помощью бота можно записаться на массаж, "
-    "просмотреть свои записи, при необходимости отменить запись"
-)
 commands_was_activated = []
 
 
@@ -28,7 +24,7 @@ async def cmd_start(message: Message):
     appointments = await Booking.user_appointments(user_id)
     free_slots: dict[date, int] = await Booking.get_month_slots_count()
     await message.answer(
-        HI_MESSAGE,
+        M.welcome,
         reply_markup=K.menu(len(appointments), free_slots),
     )
 
@@ -41,7 +37,7 @@ async def cb_menu(cb: CallbackQuery):
 
     free_slots: dict[date, int] = await Booking.get_month_slots_count()
     await cb.message.edit_text(
-        HI_MESSAGE,
+        M.welcome,
         reply_markup=K.menu(len(appointments), free_slots),
     )
 
@@ -159,7 +155,7 @@ async def cb_delete_my_appointment(cb: CallbackQuery):
     appointments = await Booking.user_appointments(user_id)
     if not appointments:
         free_slots: dict[date, int] = await Booking.get_month_slots_count()
-        text = HI_MESSAGE
+        text = M.welcome
         rpm = K.menu(len(appointments), free_slots)
     else:
         text = "Ваши записи\nДля удаления записи нажмите на нее"

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "appointment-booking"
+name = "body-wrap"
 version = "1.0.0"
 description = ""
 authors = ["Nikolay Adamov <adamov.nikooo@gmail.com>"]

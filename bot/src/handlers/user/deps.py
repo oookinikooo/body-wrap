@@ -9,6 +9,11 @@ from src.utils.tools import month_alias, month_alias_dec, weekday_alias
 
 
 class Message:
+    welcome = (
+        "Добро пожаловать!\n"
+        "С помощью бота можно записаться на обертывание, просмотреть свои "
+        "записи, при необходимости отменить запись"
+    )
 
     @staticmethod
     def pick_hour(d: date):
