@@ -10,7 +10,7 @@ class Service:
 
     def __init__(
         self,
-        db_path: str = "database.sqlite3",
+        db_path: str = "db.sqlite3",
         tablename: str = "booking",
     ):
         self.db_path = db_path
