@@ -80,13 +80,11 @@ async def main():
     attach_handlers(dp)
 
     await bot.delete_webhook(drop_pending_updates=True)
-    try:
-        await dp.start_polling(bot)
-    except Exception:
-        logger.exception("pooling down")
-    else:
-        await bot.session.close()
+    await dp.start_polling(bot, polling_timeout=60)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception:
+        logger.exception("Run main()")
