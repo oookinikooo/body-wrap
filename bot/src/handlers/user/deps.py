@@ -36,17 +36,14 @@ class Message:
 class Keyboard:
 
     @staticmethod
-    def menu(appointment_count: int, free_slots: dict[date, int]):
+    def menu(appointment_count: int, active_months: list[date], free_slots: dict[date, int]):
         months = []
-        for d in sorted(free_slots):
-            months.append(
-                [
-                    Button(
-                        text=f"Записаться на {month_alias(d.month)} ({free_slots[d]})",
-                        callback_data=f"{d}~explore_month",
-                    )
-                ]
-            )
+        for d in sorted(active_months):
+            slot_count = free_slots.get(d, 0)
+            text = f"Записаться на {month_alias(d.month)} ({slot_count})"
+            cb_data = "~no_free_slots" if slot_count == 0 else f"{d}~explore_month"
+            months.append([Button(text=text, callback_data=cb_data)])
+
         return InlineKeyboardMarkup(
             inline_keyboard=[
                 [

@@ -239,3 +239,14 @@ class Service:
             async with db.execute(query) as cursor:
                 rows = await cursor.fetchall()
                 return [Session(**dict(r)) for r in rows]
+
+    async def get_user_ids(self): 
+        query =  f'''SELECT DISTINCT user_id FROM {self._tablename}'''
+        async with self._session_maker() as db:
+            async with db.execute(query) as cursor:
+                rows = await cursor.fetchall()
+                resp: list[int] = []
+                for r in rows:
+                    if user_id := dict(r).get("user_id"):
+                        resp.append(user_id)
+                return resp
