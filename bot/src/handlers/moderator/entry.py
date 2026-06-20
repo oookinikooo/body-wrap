@@ -9,11 +9,15 @@ from aiogram.types import CallbackQuery, Message
 from src.config import config
 from src.services.booking import Booking, Session, SessionAdd
 from src.utils.filters import ModeratorFilter
-from src.utils.tools import (month_alias, month_alias_dec,
-                             set_moderator_commands, weekday_alias)
+from src.utils.tools import (
+    month_alias,
+    month_alias_dec,
+    set_moderator_commands,
+    weekday_alias,
+)
 
-from .desp import Keyboard as K
-from .desp import Message as M
+from .deps import Keyboard as K
+from .deps import Message as M
 
 logger = logging.getLogger(__name__)
 commands_was_activated = []

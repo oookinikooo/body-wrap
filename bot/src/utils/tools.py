@@ -4,9 +4,11 @@ from datetime import datetime
 from typing import Literal
 
 from aiogram import Bot
-from aiogram.types import BotCommand, BotCommandScopeChat
+from aiogram.types import BotCommand, BotCommandScopeChat, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton as Button
 from src.config import config
-from src.services.booking import Session, User
+from src.services.booking import Session
+from src.services.user import User
 
 logger = logging.getLogger('utils.tools')
 
@@ -130,3 +132,46 @@ async def notify_user(
             else:
                 return True
     return False
+
+
+async def notify_about_adding(bot: Bot, user_id: int):
+    text = "✅ Доступ предоставлен\nНажмите комманду /start для начала работы"
+    for i in (1, 2, 3):
+        try:
+            await bot.send_message(user_id, text)
+        except Exception as e:
+            logger.error(f"Notify user about adding failed. Attempt-{i}. "
+                         f"Retry after 0.15s\n{type(e).__name__}: {e}")
+            await asyncio.sleep(0.15)
+        else:
+            await set_user_commands(bot, user_id)
+            return True
+    return False
+
+
+async def notify_admin_about_new_user(bot: Bot, user: User):
+    text = f"☘️ Новый пользователь #{user.id} - {user.fullname}"
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            Button(text="Добавить", callback_data=f"1~{user.id}~user_activation"),
+            Button(text="Отклонить", callback_data=f"~{user.id}~user_activation"),
+        ]
+    ]) 
+    for admin_id in config.admin_ids:
+        for i in (1, 2, 3):
+            try:
+                await bot.send_message(
+                    admin_id,
+                    text,
+                    reply_markup=kb,
+                    parse_mode="HTML",
+                )
+            except Exception as e:
+                logger.error(
+                    f"Notify admin about new user failed. Attempt-{i}. "
+                    f"Retry after 0.15s\n{type(e).__name__}: {e}"
+                )
+                await asyncio.sleep(0.15)
+            else:
+                break
+    return True

@@ -4,12 +4,11 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from src.services.booking import Booking, User
-from src.utils.tools import notify_admin, set_user_commands
+from src.utils.tools import notify_admin
 
 from .deps import Keyboard as K
 from .deps import Message as M
 
-commands_was_activated = []
 
 async def get_menu_text_rpm(user_id: int):
     appointments = await Booking.user_appointments(user_id)
@@ -19,13 +18,7 @@ async def get_menu_text_rpm(user_id: int):
 
 
 async def cmd_start(message: Message):
-    global commands_was_activated
-
     user_id = message.from_user.id
-    if user_id not in commands_was_activated:
-        is_ok = await set_user_commands(message.bot, user_id)
-        if is_ok:
-            commands_was_activated.append(user_id)
 
     text, rpm = await get_menu_text_rpm(user_id)
     await message.answer(text, reply_markup=rpm)

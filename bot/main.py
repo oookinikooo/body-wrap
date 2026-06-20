@@ -10,6 +10,7 @@ from aiogram.enums.parse_mode import ParseMode
 from src.config import config
 from src.handlers import attach_handlers
 from src.services.booking import Booking
+from src.services.user import Users
 from src.utils.tools import notify_user, startup
 
 logging.basicConfig(level="INFO",
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 async def main():
     await Booking.init_db()
+    await Users().init_db()
 
     bot = Bot(token=config.token,
               default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -80,7 +82,8 @@ async def main():
     attach_handlers(dp)
 
     await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot, polling_timeout=60)
+    async with bot:
+        await dp.start_polling(bot, polling_timeout=60)
 
 
 if __name__ == "__main__":

@@ -40,7 +40,7 @@ class Service:
                     fullname TEXT,
                     reservation_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
+                );
                 """
             )
             await db.commit()
@@ -250,3 +250,10 @@ class Service:
                     if user_id := dict(r).get("user_id"):
                         resp.append(user_id)
                 return resp
+
+    async def get_all(self):
+        query =  f'''SELECT * FROM {self._tablename}'''
+        async with self._session_maker() as db:
+            async with db.execute(query) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(r) for r in rows]
