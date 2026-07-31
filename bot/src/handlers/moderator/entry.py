@@ -3,7 +3,7 @@ import logging
 from collections import defaultdict
 from datetime import date, datetime, time
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from src.config import config
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 commands_was_activated = []
 
 
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, bot: Bot):
     if await Booking.is_hiden():
         return
 
@@ -31,7 +31,7 @@ async def cmd_start(message: Message):
 
     user_id = message.from_user.id
     if user_id not in commands_was_activated:
-        is_ok = await set_moderator_commands(message.bot, user_id)
+        is_ok = await set_moderator_commands(bot, user_id)
         if is_ok:
             commands_was_activated.append(user_id)
 

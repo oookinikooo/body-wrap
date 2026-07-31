@@ -178,7 +178,7 @@ class Service:
                 rows = await cursor.fetchall()
                 return [Session(**dict(r)) for r in rows]
 
-    async def get_month_slots_count(self):
+    async def get_month_slots_count(self) -> dict[date, int]:
         query = f'''
             SELECT
                 strftime('%Y-%m', date) as month,

@@ -1,13 +1,17 @@
+import inspect
+import logging
 from datetime import date, datetime
 
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from src.services.booking import Booking, User
-from src.utils.tools import notify_admin
+from src.utils.tools import notify_admin, notify_users_about_freed_slot
 
 from .deps import Keyboard as K
 from .deps import Message as M
+
+logger = logging.getLogger(__name__)
 
 
 async def get_menu_text_rpm(user_id: int):
@@ -125,6 +129,7 @@ async def cb_delete_my_appointment(cb: CallbackQuery):
     session_id, sure_flag, *_ = cb.data.split('~')
     session_id = int(session_id)
 
+    notify_coro = None
     session = await Booking.get(session_id)
     if session and session.user:
         if not sure_flag:
@@ -139,6 +144,8 @@ async def cb_delete_my_appointment(cb: CallbackQuery):
         is_ok = await Booking.reset_appointment(session_id)
         if is_ok:
             await notify_admin(cb.bot, session, "reject")
+
+            notify_coro = notify_users_about_freed_slot(cb.bot, session, [user_id, ])
 
             text = "Запись отменена!"
         else:
@@ -156,6 +163,12 @@ async def cb_delete_my_appointment(cb: CallbackQuery):
         rpm = K.appointments(appointments)
 
     await cb.message.edit_text(text, reply_markup=rpm)
+
+    if notify_coro and inspect.iscoroutine(notify_coro):
+        try:
+            await notify_coro
+        except Exception as e:
+            logger.error(f"When notify users about new slots - {e}")
 
 
 def router():

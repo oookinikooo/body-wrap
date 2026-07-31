@@ -7,8 +7,8 @@ from aiogram import Bot
 from aiogram.types import BotCommand, BotCommandScopeChat, InlineKeyboardMarkup
 from aiogram.types import InlineKeyboardButton as Button
 from src.config import config
-from src.services.booking import Session
-from src.services.user import User
+from src.services.booking import Booking, Session
+from src.services.user import User, Users
 
 logger = logging.getLogger('utils.tools')
 
@@ -63,6 +63,7 @@ async def set_moderator_commands(bot: Bot, user_id: int):
         user_id,
         [
             BotCommand(command="start", description="Открыть меню"),
+            BotCommand(command="send", description="Отправить сообщение пользователям"),
             BotCommand(command="restart", description="Перезапуск"),
         ],
     )
@@ -96,6 +97,47 @@ async def notify_admin(bot: Bot, session: Session, action: Literal["make", "reje
                 break
 
     return True
+
+
+async def notify_users_about_freed_slot(
+    bot: Bot,
+    session: Session,
+    ignore_ids: list[int] | None = None,
+):
+    now = datetime.today()
+    if session.date.year == now.year and session.date.month == now.month:
+        month_slots = await Booking.get_month_slots_count()
+        if free_slots := month_slots.get(now.date().replace(day=1)):
+            if 0 < free_slots <= 3:
+                text = (
+                    f"{session.date.day} {month_alias_dec(session.date.month)} "
+                    f"на {session.time.hour:02}:{session.time.minute:02} освободилось время на массаж"
+                )
+                if ignore_ids is None:
+                    ignore_ids = []
+
+                position, page, cap = 0, 0, 10
+                while True:
+                    users = await Users().get_slice(page, cap, is_active=True)
+                    if not users:
+                        break
+
+                    page += 1
+
+                    for user in users:
+                        if user.id in ignore_ids:
+                            continue
+
+                        if position != 0 and position % cap == 0:
+                            await asyncio.sleep(0.15)
+
+                        position += 1
+
+                        try:
+                            await bot.send_message(chat_id=user.id, text=text, parse_mode=None)
+                        except Exception as e:
+                            logger.error(f"Send manager msg to #{user.id} - {e}")
+                            await asyncio.sleep(0.075)
 
 
 def hi():

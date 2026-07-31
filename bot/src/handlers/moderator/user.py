@@ -1,13 +1,18 @@
+import asyncio
+import logging
 import math
 
 from aiogram import Bot, F, Router
-from aiogram.types import CallbackQuery
+from aiogram.filters import Command
+from aiogram.types import CallbackQuery, Message
 from src.services.user import Users
 from src.utils.filters import ModeratorFilter
 from src.utils.tools import notify_about_adding
 
 from .deps import Keyboard as K
 from .deps import Message as M
+
+logger = logging.getLogger(__name__)
 
 
 async def cb_categories(cb: CallbackQuery):
@@ -105,8 +110,69 @@ async def cb_user_activation(cb: CallbackQuery, bot: Bot):
     await msg.reply(text)
 
 
+async def cmd_send(message: Message, bot: Bot):
+    reply_to_message = message.reply_to_message
+    if reply_to_message is None:
+        text = (
+            "Отправка сообщения пользователям бота\n\n"
+            "Введите комманду /send ссылаясь на то сообщение из текущего чата, "
+            "которым хотите поделиться\n\n"
+            "<i>Примечание: текст сообщения будет отправлен в том виде, "
+            "в котором вы его написали, учитывая форматирование и стикеры</i>"
+        )
+        await message.answer(text)
+        return
+
+    text, entities = reply_to_message.text, reply_to_message.entities
+    if not text:
+        await message.answer("Вы ссылаетесь на сообщение в котором нет текста")
+        return
+
+    total = await Users().count(is_active=True)
+    progress_text = "Отправлено {} из {}".format('{}', total)
+
+    msg = await message.answer(progress_text.format(0))
+
+    position, page, cap = 0, 0, 10
+    while True:
+        users = await Users().get_slice(page, cap, is_active=True)
+        if not users:
+            break
+
+        page += 1
+
+        for user in users:
+            if position != 0 and position % cap == 0:
+                await msg.edit_text(progress_text.format(position)) 
+                await asyncio.sleep(0.5)
+
+            position += 1
+
+            for _ in (0, 1):
+                try:
+                    await bot.send_message(
+                        chat_id=user.id,
+                        text=text,
+                        entities=entities,
+                        parse_mode=None,
+                    )
+                    break
+                except Exception as e:
+                    logger.error(f"Send manager msg to #{user.id} - {e}")
+                    if "bot was blocked by the user" in str(e):
+                        break
+
+                    await asyncio.sleep(0.15)
+
+    await msg.edit_text(f"Отправлено {position} из {total}")
+
+
 def router():
     router = Router()
+    for func, cmd_filter in (
+        (cmd_send, Command("send")),
+    ):
+        router.message.register(func, cmd_filter, ModeratorFilter())
     for func, trigger in (
         (cb_categories, F.data.endswith("~user_categories")),
         (cb_by_status, F.data.endswith("~users")),
